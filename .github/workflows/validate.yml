@@ -24,6 +24,7 @@ jobs:
           test -f scripts/boot.gd
 
           grep -Fq 'run/main_scene="res://scenes/boot.tscn"' project.godot
+          grep -Fq 'config/features=PackedStringArray("4.6", "GL Compatibility")' project.godot
           grep -Fq 'path="res://scripts/boot.gd"' scenes/boot.tscn
           grep -Fq 'extends Control' scripts/boot.gd
           grep -Fq 'user://lingoblaze_boot_progress.json' scripts/boot.gd
