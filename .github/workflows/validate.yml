@@ -1,0 +1,63 @@
+name: Validate Xogot Boot
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6.0.2
+
+      - name: Validate Xogot project structure
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -f project.godot
+          test -f scenes/boot.tscn
+          test -f scripts/boot.gd
+
+          grep -Fq 'run/main_scene="res://scenes/boot.tscn"' project.godot
+          grep -Fq 'path="res://scripts/boot.gd"' scenes/boot.tscn
+          grep -Fq 'extends Control' scripts/boot.gd
+          grep -Fq 'user://lingoblaze_boot_progress.json' scripts/boot.gd
+
+          for pattern in '*.cs' '*.cpp' '*.cxx' '*.cc' '*.c' '*.mm' '*.m' '*.swift' '*.rs' '*.gdextension'; do
+            if find . -type f -name "$pattern" -print -quit | grep -q .; then
+              echo "Forbidden Xogot-incompatible file detected: $pattern"
+              exit 1
+            fi
+          done
+
+          if grep -RInE 'HTTPRequest|HTTPClient|WebSocketPeer|StreamPeerTCP|TCPServer|UDPServer' \
+            --include='*.gd' .; then
+            echo 'Network-capable GDScript API detected in offline boot project.'
+            exit 1
+          fi
+
+      - name: Validate local resource references
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          files = [Path('project.godot'), *Path('.').rglob('*.tscn')]
+          missing = []
+
+          for source in files:
+              text = source.read_text(encoding='utf-8')
+              for resource in re.findall(r'res://[^"\s]+', text):
+                  target = Path(resource.removeprefix('res://'))
+                  if not target.exists():
+                      missing.append(f'{source}: {resource}')
+
+          if missing:
+              raise SystemExit('Missing resources:\n' + '\n'.join(missing))
+
+          print('All local resource references exist.')
